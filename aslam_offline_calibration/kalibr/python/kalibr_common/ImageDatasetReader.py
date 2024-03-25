@@ -68,7 +68,7 @@ class BagImageDatasetReader(object):
     #   self.indices = self.truncateIndicesFromFreq(self.indices, bag_freq)
 
     with Reader(self.bagfile) as reader:
-      self.indices = np.arange(len(reader.duration))
+      self.indices = np.arange(reader.duration)
       self.reader = reader
       self.conx = [[x for x in reader.connections if x.topic == self.topic]]
 
