@@ -11,6 +11,8 @@ import time
 import copy
 import cv2
 
+from rosbags.serde import deserialize_cdr
+
 def multicoreExtractionWrapper(detector, taskq, resultq, clearImages, noTransformation):    
     while 1:
         try:
@@ -31,6 +33,16 @@ def multicoreExtractionWrapper(detector, taskq, resultq, clearImages, noTransfor
         if success:
             resultq.put( (obs, idx) )
 
+def get_opencv_img_from_buffer(buffer, flags, CONVERT_BGR=True):
+    bytes_as_np_array = np.ndarray(
+        shape=(1, len(buffer)), dtype=np.uint8, buffer=buffer
+    )
+    img = cv2.imdecode(bytes_as_np_array, flags)
+    if CONVERT_BGR:
+        return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    else:
+        return img
+
 def extractCornersFromDataset(dataset, detector, multithreading=False, numProcesses=None, clearImages=True, noTransformation=False):
     print("Extracting calibration target corners")    
     targetObservations = []
@@ -49,7 +61,10 @@ def extractCornersFromDataset(dataset, detector, multithreading=False, numProces
             manager2 = multiprocessing.Manager()
             taskq = manager2.Queue()
             
-            for idx, (timestamp, image) in enumerate(dataset.readDataset()):
+            # for idx, (timestamp, image) in enumerate(dataset.readDataset()):
+            for idx, (connection, timestamp, rawdata) in enumerate(dataset.readDataset()):
+                msg = deserialize_cdr(rawdata = rawdata, typename=connection.msgtype)
+                image = get_opencv_img_from_buffer(msg.data, cv2.IMREAD_ANYCOLOR)
                 taskq.put( (idx, timestamp, image) )
                 
             plist=list()

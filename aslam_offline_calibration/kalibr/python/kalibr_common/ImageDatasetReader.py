@@ -7,6 +7,9 @@ import pylab as pl
 import aslam_cv as acv
 import sm
 
+from rosbags.rosbag2 import Reader
+from rosbags.serde import deserialize_cdr
+
 
 class BagImageDatasetReaderIterator(object):
   def __init__(self, dataset, indices=None):
@@ -35,7 +38,7 @@ class BagImageDatasetReader(object):
     self.bagfile = bagfile
     self.topic = imagetopic
     self.perform_synchronization = perform_synchronization
-    self.bag = rosbag.Bag(bagfile)
+    # self.bag = rosbag.Bag(bagfile)
     self.uncompress = None
     if imagetopic is None:
       raise RuntimeError(
@@ -43,26 +46,31 @@ class BagImageDatasetReader(object):
 
     self.CVB = cv_bridge.CvBridge()
     # Get the message indices
-    conx = self.bag._get_connections(topics=imagetopic)
-    indices = self.bag._get_indexes(conx)
+    # conx = self.bag._get_connections(topics=imagetopic)
+    # indices = self.bag._get_indexes(conx)
 
-    try:
-      self.index = next(indices)
-    except:
-      raise RuntimeError("Could not find topic {0} in {1}.".format(imagetopic, self.bagfile))
+    # try:
+    #   self.index = next(indices)
+    # except:
+    #   raise RuntimeError("Could not find topic {0} in {1}.".format(imagetopic, self.bagfile))
 
-    self.indices = np.arange(len(self.index))
+    # self.indices = np.arange(len(self.index))
 
-    # sort the indices by header.stamp
-    self.indices = self.sortByTime(self.indices)
+    # # sort the indices by header.stamp
+    # self.indices = self.sortByTime(self.indices)
 
-    # go through the bag and remove the indices outside the timespan [bag_start_time, bag_end_time]
-    if bag_from_to:
-      self.indices = self.truncateIndicesFromTime(self.indices, bag_from_to)
+    # # go through the bag and remove the indices outside the timespan [bag_start_time, bag_end_time]
+    # if bag_from_to:
+    #   self.indices = self.truncateIndicesFromTime(self.indices, bag_from_to)
 
-    # go through and remove indices not at the correct frequency
-    if bag_freq:
-      self.indices = self.truncateIndicesFromFreq(self.indices, bag_freq)
+    # # go through and remove indices not at the correct frequency
+    # if bag_freq:
+    #   self.indices = self.truncateIndicesFromFreq(self.indices, bag_freq)
+
+    with Reader(self.bagfile) as reader:
+      self.indices = np.arange(len(reader.duration))
+      self.reader = reader
+      self.conx = [[x for x in reader.connections if x.topic == self.topic]]
 
   # sort the ros messegaes by the header time not message time
   def sortByTime(self, indices):
@@ -137,7 +145,8 @@ class BagImageDatasetReader(object):
     return self.readDataset()
 
   def readDataset(self):
-    return BagImageDatasetReaderIterator(self, self.indices)
+    # return BagImageDatasetReaderIterator(self, self.indices)
+    return self.reader.messages(self.conx, start=0, stop=self.reader.duration)
 
   def readDatasetShuffle(self):
     indices = self.indices
